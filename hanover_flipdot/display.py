@@ -1,9 +1,14 @@
-#!/usr/bin/python
-
 import serial
 import time
 import sys
-from simulator import *
+from .simulator import Simulator
+
+def print_hex(data):
+    hex_bytes = []
+    for byte in data:
+        hex_bytes.append("0x{:02x}".format(byte))
+    print("[", " ".join(hex_bytes), "]")
+
 
 class Display(object):
     '''
@@ -16,27 +21,27 @@ class Display(object):
 
         if lines % 8:
             lines = lines + (8-(lines % 8))
-        self.lines = lines / 8
+        self.lines = lines // 8
 
         self.columns = columns - 1
 
-        self.data = ((lines * columns) / 8)
+        self.data = (lines * columns) // 8
 
         res1, res2 = self.byte_to_ascii(self.data & 0xff)
 
-        self.byte_per_column = lines / 8
+        self.byte_per_column = lines // 8
 
         address += 16
-        
+
         add1, add2 = self.byte_to_ascii(address)
         # Header part
         self.header = [0x2, add1, add2, res1, res2]
         # Footer part
         self.footer = [0x3, 0x00, 0x00]
         # Data buffer initialized to 0
-        print self.data
-        self.buf = [0] * (self.data / self.byte_per_column)
-        print len(self.buf)
+        print(self.data)
+        self.buf = [0] * (self.data // self.byte_per_column)
+        print(len(self.buf))
         # Fonts object
         self.font = font
         # Debug flag
@@ -55,14 +60,13 @@ class Display(object):
             try:
                 self.ser = serial.Serial(port=self.port, baudrate=4800)
             except:
-                print sys.exc_info()
-                print "Error opening serial port"
+                print(sys.exc_info())
+                print("Error opening serial port")
                 self.ser = None
             if self.DEBUG:
-                print "Serial port:", self.ser
+                print("Serial port:", self.ser)
         elif self.DEBUG:
-            print "Simulator instance", self.sim
-
+            print("Simulator instance", self.sim)
 
     def set_font(self, font):
         '''
@@ -75,7 +79,7 @@ class Display(object):
         Erase all the screen
         '''
         if self.DEBUG:
-            print "Erasing all"
+            print("Erasing all")
         for i in range(len(self.buf)):
             self.buf[i] = 0
 
@@ -84,12 +88,12 @@ class Display(object):
         Write text on the first line
         '''
         if self.DEBUG:
-            print "First line text :  ", text
+            print("First line text :  ", text)
 
         # Detect the size
         mask = 0xff
         for byte in self.font[0x31]:
-             if byte.bit_length >= 9:
+            if byte.bit_length() >= 9:
                 mask = 0xffff
                 break
 
@@ -135,7 +139,7 @@ class Display(object):
         # Sum all bytes of the header and the buffer
         for byte in self.header:
             sum += byte
-        
+
         sum += dsum
 
         # Start of text (0x02) must be removed,
@@ -147,7 +151,7 @@ class Display(object):
 
         # Checksum is the sum XOR 255 + 1. So, sum of all bytes + checksum
         # is equal to 0 (8 bits)
-        crc =  (sum ^ 255) + 1
+        crc = (sum ^ 255) + 1
 
         # Transfor the checksum in ascii
         crc1, crc2 = self.byte_to_ascii(crc)
@@ -157,7 +161,7 @@ class Display(object):
         self.footer[2] = crc2
 
         if self.DEBUG:
-            print "SUM : %d, CRC : %d, SUM + CRC : %d"%(sum, crc, sum+crc)
+            print("SUM : %d, CRC : %d, SUM + CRC : %d" % (sum, crc, sum+crc))
 
     def send(self):
         '''
@@ -166,33 +170,28 @@ class Display(object):
         '''
 
         if self.DEBUG:
-            print self.header, self.buf, self.footer
-            print ""
+            print_hex(self.header)
+            print_hex(self.buf)
+            print_hex(self.footer)
         if not self.SIMULATOR:
             crc = 0
-            try:
-                # Send the header
-                for byte in self.header:
-                    self.ser.write(chr(byte))
-                # Send the data
-                for col in self.buf:
-                    for i in range(self.byte_per_column):
-                        b1, b2 = self.byte_to_ascii((col >> (8*i) & 0xFF))
-                        crc += b1
-                        crc += b2
-                        self.ser.write(chr(b1))
-                        self.ser.write(chr(b2))
-        
-                # Compute the checksum
-                self.__checksum__(crc)
+            # Send the header
+            self.ser.write(bytes(self.header))
+            # Send the data
+            for col in self.buf:
+                for i in range(self.byte_per_column):
+                    b1, b2 = self.byte_to_ascii((col >> (8*i) & 0xFF))
+                    crc += b1
+                    crc += b2
+                    self.ser.write(bytes([b1, b2]))
 
-                # Send the footer
-                for byte in self.footer:
-                    self.ser.write(chr(byte))
+            # Compute the checksum
+            self.__checksum__(crc)
 
-                return 0
-            except:
-                return -1
+            # Send the footer
+            self.ser.write(bytes(self.footer))
+
+            return 0
         else:
             simbuf = []
             for byte in self.buf:

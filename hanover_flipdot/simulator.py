@@ -2,7 +2,7 @@
 
 class Simulator(object):
     def __init__(self):
-        print "\033[2J"
+        print("\033[2J")
 
     def __unascii__(self, byte):
         if byte > 0x40:
@@ -25,6 +25,6 @@ class Simulator(object):
             r = (lines * 8) - 1
             for k in range(r, -1, -1):
                 if byte & (1 << (k)):
-                    print "\033[43m\033[%d;%dH \033[0m"%((k+1), i)
+                    print("\033[43m\033[%d;%dH \033[0m"%((k+1), i))
                 else:
-                    print "\033[100m\033[%d;%dH \033[0m"%((k+1), i)
+                    print("\033[100m\033[%d;%dH \033[0m"%((k+1), i))
