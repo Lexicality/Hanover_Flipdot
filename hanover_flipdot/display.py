@@ -21,15 +21,16 @@ class Display(object):
 
         if lines % 8:
             lines = lines + (8-(lines % 8))
-        self.lines = lines // 8
+        print("Lines", lines)
 
         self.columns = columns - 1
 
-        self.data = (lines * columns) // 8
-
-        res1, res2 = self.byte_to_ascii(self.data & 0xff)
-
         self.byte_per_column = lines // 8
+        self.buf_size = columns
+
+        assert self.buf_size < 255
+
+        res1, res2 = self.byte_to_ascii(self.buf_size * 2)
 
         address += 16
 
@@ -39,9 +40,7 @@ class Display(object):
         # Footer part
         self.footer = [0x3, 0x00, 0x00]
         # Data buffer initialized to 0
-        print(self.data)
-        self.buf = [0] * (self.data // self.byte_per_column)
-        print(len(self.buf))
+        self.buf = [0] * self.buf_size
         # Fonts object
         self.font = font
         # Debug flag
@@ -128,40 +127,36 @@ class Display(object):
             b2 += 0x37
         else:
             b2 += 0x30
-
         return (b1, b2)
 
     def __checksum__(self, dsum):
         '''
         Compute the checksum of the data frame
         '''
-        sum = 0
         # Sum all bytes of the header and the buffer
-        for byte in self.header:
-            sum += byte
-
-        sum += dsum
+        csum = sum(self.header)
+        csum += dsum
 
         # Start of text (0x02) must be removed,
         # End of text (0x03) must be added
-        sum += 1
+        csum += 1
 
         # Result must be casted to 8 bits
-        sum = sum & 0xFF
+        csum = csum & 0xFF
 
-        # Checksum is the sum XOR 255 + 1. So, sum of all bytes + checksum
+        # Checkcsum is the csum XOR 255 + 1. So, csum of all bytes + checkcsum
         # is equal to 0 (8 bits)
-        crc = (sum ^ 255) + 1
+        crc = (csum ^ 255) + 1
 
-        # Transfor the checksum in ascii
+        # Transfor the checkcsum in ascii
         crc1, crc2 = self.byte_to_ascii(crc)
 
-        # Add the checksum on the footer
+        # Add the checkcsum on the footer
         self.footer[1] = crc1
         self.footer[2] = crc2
 
         if self.DEBUG:
-            print("SUM : %d, CRC : %d, SUM + CRC : %d" % (sum, crc, sum+crc))
+            print("SUM : %d, CRC : %d, SUM + CRC : %d" % (csum, crc, csum+crc))
 
     def send(self):
         '''
@@ -172,32 +167,23 @@ class Display(object):
         if self.DEBUG:
             print_hex(self.header)
             print_hex(self.buf)
+        crc = 0
+        # Send the header
+        self.ser.write(bytes(self.header))
+        # Send the data
+        for col in self.buf:
+            for i in range(self.byte_per_column):
+                b1, b2 = self.byte_to_ascii((col >> (8*i) & 0xFF))
+                crc += b1
+                crc += b2
+                self.ser.write(bytes([b1, b2]))
+
+        # Compute the checksum
+        self.__checksum__(crc)
+
+        if self.DEBUG:
             print_hex(self.footer)
-        if not self.SIMULATOR:
-            crc = 0
-            # Send the header
-            self.ser.write(bytes(self.header))
-            # Send the data
-            for col in self.buf:
-                for i in range(self.byte_per_column):
-                    b1, b2 = self.byte_to_ascii((col >> (8*i) & 0xFF))
-                    crc += b1
-                    crc += b2
-                    self.ser.write(bytes([b1, b2]))
+        # Send the footer
+        self.ser.write(bytes(self.footer))
 
-            # Compute the checksum
-            self.__checksum__(crc)
-
-            # Send the footer
-            self.ser.write(bytes(self.footer))
-
-            return 0
-        else:
-            simbuf = []
-            for byte in self.buf:
-                for i in range(self.lines):
-                    b1, b2 = self.byte_to_ascii(byte >> (i*8) & 0xFF)
-                    simbuf.append(b2)
-                    simbuf.append(b1)
-            self.sim.display(simbuf, self.lines)
-            return 0
+        return 0
