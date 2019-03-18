@@ -3,6 +3,7 @@ import time
 import sys
 from .simulator import Simulator
 
+
 def print_hex(data):
     hex_bytes = []
     for byte in data:
@@ -11,16 +12,19 @@ def print_hex(data):
 
 
 class Display(object):
-    '''
+    """
     Driver for the Hanover display.
     Currently, this driver only works with resolution of 128x16, at address 1
     This limitation must be changed in a future version.
-    '''
-    def __init__(self, serial, address, columns, lines, font, debug=False, simulator=False):
+    """
+
+    def __init__(
+        self, serial, address, columns, lines, font, debug=False, simulator=False
+    ):
         self.port = serial
 
         if lines % 8:
-            lines = lines + (8-(lines % 8))
+            lines = lines + (8 - (lines % 8))
         print("Lines", lines)
 
         self.columns = columns - 1
@@ -52,9 +56,9 @@ class Display(object):
         self.connect()
 
     def connect(self):
-        '''
+        """
         Connect to the serial device
-        '''
+        """
         if not self.SIMULATOR:
             try:
                 self.ser = serial.Serial(port=self.port, baudrate=4800)
@@ -68,32 +72,32 @@ class Display(object):
             print("Simulator instance", self.sim)
 
     def set_font(self, font):
-        '''
+        """
         Set a font
-        '''
+        """
         self.font = font
 
     def erase_all(self):
-        '''
+        """
         Erase all the screen
-        '''
+        """
         if self.DEBUG:
             print("Erasing all")
         for i in range(len(self.buf)):
             self.buf[i] = 0
 
     def write_text(self, text, line=0, column=0):
-        '''
+        """
         Write text on the first line
-        '''
+        """
         if self.DEBUG:
             print("First line text :  ", text)
 
         # Detect the size
-        mask = 0xff
+        mask = 0xFF
         for byte in self.font[0x31]:
             if byte.bit_length() >= 9:
-                mask = 0xffff
+                mask = 0xFFFF
                 break
 
         # Parse all the characters
@@ -102,18 +106,22 @@ class Display(object):
             for i in range(len(self.font[0])):
                 if column > self.columns:
                     return 0
-                self.buf[column] &= ~((mask << line) & ((1 << self.byte_per_column*8)-1))
-                self.buf[column] |= ((self.font[ord(char)][i])<<line) &  (1 << (self.byte_per_column * 8)) - 1
+                self.buf[column] &= ~(
+                    (mask << line) & ((1 << self.byte_per_column * 8) - 1)
+                )
+                self.buf[column] |= ((self.font[ord(char)][i]) << line) & (
+                    1 << (self.byte_per_column * 8)
+                ) - 1
                 column += 1
 
     def byte_to_ascii(self, byte):
-        '''
+        """
         Convert a byte to its ascii reprensentation.
         The transmission represent each byte by their ASCII representation.
         For example, 0x67 is reprensented by 0x36 0x37 (ascii 6 and ascii 7)
         This is not an elegant way to convert the data, and this function must
         be refactored
-        '''
+        """
         b1 = 0
         b2 = 0
         b1 = byte >> 4
@@ -130,9 +138,9 @@ class Display(object):
         return (b1, b2)
 
     def __checksum__(self, dsum):
-        '''
+        """
         Compute the checksum of the data frame
-        '''
+        """
         # Sum all bytes of the header and the buffer
         csum = sum(self.header)
         csum += dsum
@@ -156,13 +164,13 @@ class Display(object):
         self.footer[2] = crc2
 
         if self.DEBUG:
-            print("SUM : %d, CRC : %d, SUM + CRC : %d" % (csum, crc, csum+crc))
+            print("SUM : %d, CRC : %d, SUM + CRC : %d" % (csum, crc, csum + crc))
 
     def send(self):
-        '''
+        """
         Send the frame via the serial port
         :return: Return 0 on success, -1 on errors
-        '''
+        """
 
         if self.DEBUG:
             print_hex(self.header)
@@ -173,7 +181,7 @@ class Display(object):
         # Send the data
         for col in self.buf:
             for i in range(self.byte_per_column):
-                b1, b2 = self.byte_to_ascii((col >> (8*i) & 0xFF))
+                b1, b2 = self.byte_to_ascii((col >> (8 * i) & 0xFF))
                 crc += b1
                 crc += b2
                 self.ser.write(bytes([b1, b2]))
