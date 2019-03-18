@@ -1,5 +1,6 @@
-from typing import Dict
+import time
 from collections import defaultdict
+from typing import Dict
 
 from hanover_flipdot.redo import Checkerfield
 
@@ -76,3 +77,11 @@ class GOL:
             for x in range(self.cols):
                 self.field[x][y] = False
         self.flipdot.send()
+
+    def simulate(self, delay=0.2) -> None:
+        try:
+            while True:
+                self.step()
+                time.sleep(delay)
+        except KeyboardInterrupt:
+            Exception
