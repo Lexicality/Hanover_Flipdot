@@ -1,0 +1,5 @@
+pyserial
+bitarray
+black
+flake8
+pip-tools
