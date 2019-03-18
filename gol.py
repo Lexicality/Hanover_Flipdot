@@ -24,14 +24,18 @@ class GOL:
         for x in range(self.cols):
             self.field[x] = {y: False for y in range(self.rows)}
 
-    def set(self, x: int, y: int, state: bool) -> None:
+    def set(self, x: int, y: int, state: bool, send=False) -> None:
         assert x < self.cols and y < self.rows
 
         self.field[x][y] = state
         self.flipdot.set(x, y, state)
+        if send:
+            self.update()
+
+    def update(self) -> None:
+        self.flipdot.send()
 
     def _surround(self, x: int, y: int):
-        print("SURROUND FOR", x, y)
         for xx in range(-1, 2):
             for yy in range(-1, 2):
                 if xx == 0 and yy == 0:
@@ -39,12 +43,12 @@ class GOL:
                 yield self.field[cycle(x + xx, self.cols)][cycle(y + yy, self.rows)]
 
     def step(self) -> None:
-        for y in range(self.rows):
-            for x in range(self.cols):
-                n = self.field[x][y]
-                w = "X" if n else "O"
-                print(w, end="")
-            print()
+        # for y in range(self.rows):
+        #     for x in range(self.cols):
+        #         n = self.field[x][y]
+        #         w = "X" if n else "O"
+        #         print(w, end="")
+        #     print()
 
         new = defaultdict(dict)
         for x, ys in self.field.items():
@@ -61,14 +65,14 @@ class GOL:
             for y, alive in ys.items():
                 self.set(x, y, alive)
 
-        for y in range(self.rows):
-            for x in range(self.cols):
-                n = self.field[x][y]
-                w = "X" if n else "O"
-                print(w, end="")
-            print()
-
         self.flipdot.send()
 
     def stop(self) -> None:
         self.flipdot.stop()
+
+    def clear(self) -> None:
+        self.flipdot.clear()
+        for y in range(self.rows):
+            for x in range(self.cols):
+                self.field[x][y] = False
+        self.flipdot.send()
